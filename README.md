@@ -135,6 +135,17 @@ DemoV3/
 
 ## 同步到 GitHub
 
+### 一键推送（推荐）
+
+双击运行 **`推送到GitHub.bat`** 即可自动完成提交与推送。
+
+**完全自动（无需任何手动步骤）**：先设置环境变量 `GITHUB_TOKEN`：
+1. 打开 https://github.com/settings/tokens 创建 token（勾选 `repo` 权限）
+2. 运行：`setx GITHUB_TOKEN 你的token`
+3. 重新打开终端，双击 `推送到GitHub.bat`
+
+**或首次登录**：若未设置 token，脚本会打开浏览器完成 GitHub 登录（仅需一次），之后即可自动推送。
+
 ### 安全说明
 
 以下文件已加入 `.gitignore`，**不会**提交到 Git：
@@ -143,7 +154,7 @@ DemoV3/
 - `eval_history.db` - 用户数据
 - `venv/`、`build/`、`dist/` - 构建产物
 
-### 同步步骤
+### 手动同步步骤
 
 ```bash
 # 1. 初始化 Git（若尚未初始化）

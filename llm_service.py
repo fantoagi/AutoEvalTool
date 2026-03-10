@@ -11,10 +11,19 @@ import hmac
 import hashlib
 import base64
 import os
+import sys
 import threading
 
-# 日志文件路径（与当前脚本同目录）
-LOG_FILE = os.path.join(os.path.dirname(__file__), "process.log")
+
+def _get_log_dir():
+    """获取日志目录：打包为 exe 时用 exe 所在目录，否则用脚本所在目录"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+# 日志文件路径（exe 运行时写入 exe 同目录，脚本运行时写入脚本同目录）
+LOG_FILE = os.path.join(_get_log_dir(), "process.log")
 
 # 日志写入锁，确保多线程环境下日志写入的线程安全
 _log_lock = threading.Lock()

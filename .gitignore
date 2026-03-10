@@ -1,0 +1,42 @@
+# ===== 敏感信息（切勿提交） =====
+config/summary_generation.cfg
+*.env
+.env
+.env.*
+secrets.toml
+*.pem
+*.key
+
+# ===== 运行时/用户数据 =====
+process.log
+*.log
+eval_history.db
+org/
+CSV/
+result/
+
+# ===== Python =====
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# ===== IDE/系统 =====
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== 打包输出 =====
+*.exe
+*.spec.bak

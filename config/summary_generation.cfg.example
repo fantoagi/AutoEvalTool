@@ -1,0 +1,57 @@
+# LLM 配置模板 - 复制为 summary_generation.cfg 并填写真实 API Key
+# 注意：summary_generation.cfg 已加入 .gitignore，不会提交到 Git
+
+[文件路径]
+csv_dir = CSV
+result_dir = result
+prompt_dir = 辅助小结
+prompt_file_name = prompt.md
+compare_prompt_file_name = compare.md
+csv_file_name = 
+
+[LLM配置-主模型]
+api_key = YOUR_API_KEY_HERE
+base_url = https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+model = qwen3-4b
+temperature = 0.3
+top_p = 0.7
+
+[LLM配置-比较模型]
+compare_api_key = YOUR_API_KEY_HERE
+compare_base_url = https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+compare_model = deepseek-v3.2
+compare_temperature = 0.3
+compare_top_p = 0.9
+
+[鉴权配置-主模型]
+enable_auth = False
+calculate_auth = True
+authorization = 
+app_key = 
+app_secret = 
+source = 
+org_id = 
+org_name = 
+full_org_name = 
+oa_code = 
+user_name = 
+
+[鉴权配置-比较模型]
+enable_auth = False
+calculate_auth = True
+authorization = 
+app_key = 
+app_secret = 
+source = 
+org_id = 
+org_name = 
+full_org_name = 
+oa_code = 
+user_name = 
+
+[性能配置]
+max_workers = 5
+sample_size = 0
+
+[输出配置]
+output_format = csv

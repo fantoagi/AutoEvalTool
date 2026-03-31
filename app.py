@@ -5,7 +5,7 @@ Streamlit主应用
 import streamlit as st
 import pandas as pd
 import io
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from typing import Dict, Tuple
 import json
 import os
@@ -82,6 +82,36 @@ else:
     # 开发环境：使用脚本所在目录
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "config", "summary_generation.cfg")
+# 比较评估用提示词持久化文件（Markdown，换上传文件时仍保留上次编辑内容）
+COMPARE_PROMPT_FILE = os.path.join(SCRIPT_DIR, "config", "compare_prompt_template.md")
+# 旧版 .txt，仅用于迁移读取
+_COMPARE_PROMPT_FILE_LEGACY = os.path.join(SCRIPT_DIR, "config", "compare_prompt_template.txt")
+
+
+def _load_compare_prompt_from_file():
+    """从本地读取上次保存的比较提示词，失败返回 None。"""
+    for path in (COMPARE_PROMPT_FILE, _COMPARE_PROMPT_FILE_LEGACY):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            if text.strip():
+                return text
+        except Exception:
+            continue
+    return None
+
+
+def _save_compare_prompt_to_file(text: str) -> None:
+    """将比较提示词写入本地 Markdown 文件（与 summary_generation.cfg 同目录）。"""
+    try:
+        os.makedirs(os.path.dirname(COMPARE_PROMPT_FILE), exist_ok=True)
+        with open(COMPARE_PROMPT_FILE, "w", encoding="utf-8") as f:
+            f.write(text or "")
+    except Exception:
+        pass
+
 
 # 默认提示词模板
 DEFAULT_PROMPT_TEMPLATE = """请判断以下待评估内容是否符合标准答案。
@@ -224,6 +254,13 @@ def load_config():
         st.session_state.oa_code = ""
     if 'user_name' not in st.session_state:
         st.session_state.user_name = ""
+
+    # 比较提示词：会话内用固定 key；首次从文件恢复，避免换上传文件后 text_area 被默认值覆盖
+    if "compare_prompt_textarea" not in st.session_state:
+        loaded = _load_compare_prompt_from_file()
+        st.session_state.compare_prompt_textarea = (
+            loaded if loaded else DEFAULT_PROMPT_TEMPLATE
+        )
 
     # 首次加载时，从 summary_generation.cfg 里同步一份比较模型配置
     if 'config_loaded' not in st.session_state:
@@ -516,14 +553,16 @@ def main():
                 help="评估原因列的名称"
             )
         
-        # 步骤3: 提示词模板
+        # 步骤3: 提示词模板（key 绑定 session_state，换文件不换内容；每次运行写回文件）
         st.subheader("步骤 3: 提示词模板")
         prompt_template = st.text_area(
             "提示词模板",
-            value=DEFAULT_PROMPT_TEMPLATE,
             height=200,
-            help="必须包含 {reference} 和 {candidate} 变量。系统会自动追加JSON格式要求。"
+            key="compare_prompt_textarea",
+            help="必须包含 {reference} 和 {candidate} 变量。系统会自动追加JSON格式要求，"
+            "编辑内容会自动保存到 config/compare_prompt_template.md。",
         )
+        _save_compare_prompt_to_file(prompt_template)
         
         # 验证提示词模板
         if "{reference}" not in prompt_template or "{candidate}" not in prompt_template:
@@ -606,29 +645,39 @@ def main():
                 progress_bar.progress(1.0)
                 status_text.text("未找到待评估内容非空的记录，全部已跳过。")
             else:
+                # 长时间阻塞在单条 LLM 请求时，若不做周期性 UI 刷新，Streamlit 前端会因
+                # WebSocket 长时间无更新而断连（Network issue / 页面无响应）。用带超时的
+                # wait 在未完成时刷新状态，保持与浏览器的心跳。
+                _heartbeat_sec = 2.0
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # 提交所有任务
                     future_to_idx = {
                         executor.submit(process_single_row, task): task[0]
                         for task in tasks
                     }
-                    
-                    # 收集结果
-                    for future in as_completed(future_to_idx):
-                        try:
-                            row_idx, result, reason = future.result()
-                            results[row_idx] = (result, reason)
-                            completed += 1
-                            
-                            # 更新进度（分母为真正处理的记录数）
-                            progress = completed / total_tasks
-                            progress_bar.progress(progress)
-                            status_text.text(f"正在处理第 {completed}/{total_tasks} 条（不含跳过行）...")
-                        except Exception as e:
-                            row_idx = future_to_idx[future]
-                            results[row_idx] = ("Error", f"处理失败: {str(e)}")
+                    pending = set(future_to_idx.keys())
+                    while pending:
+                        done, pending = wait(
+                            pending,
+                            timeout=_heartbeat_sec,
+                            return_when=FIRST_COMPLETED,
+                        )
+                        if not done:
+                            status_text.text(
+                                f"等待 API 响应中… 已完成 {completed}/{total_tasks} 条（不含跳过行）"
+                            )
+                            continue
+                        for future in done:
+                            try:
+                                row_idx, result, reason = future.result()
+                                results[row_idx] = (result, reason)
+                            except Exception as e:
+                                row_idx = future_to_idx[future]
+                                results[row_idx] = ("Error", f"处理失败: {str(e)}")
                             completed += 1
                             progress_bar.progress(completed / total_tasks)
+                            status_text.text(
+                                f"正在处理第 {completed}/{total_tasks} 条（不含跳过行）..."
+                            )
             
             # 回填结果
             for row_idx, (result, reason) in results.items():

@@ -84,13 +84,21 @@ else:
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "config", "summary_generation.cfg")
 # 比较评估用提示词持久化文件（Markdown，换上传文件时仍保留上次编辑内容）
 COMPARE_PROMPT_FILE = os.path.join(SCRIPT_DIR, "config", "compare_prompt_template.md")
+# 仓库内置样例（与 cfg.example 类似，可纳入版本库供复制参考）
+COMPARE_PROMPT_EXAMPLE_FILE = os.path.join(
+    SCRIPT_DIR, "config", "compare_prompt_template.example.md"
+)
 # 旧版 .txt，仅用于迁移读取
 _COMPARE_PROMPT_FILE_LEGACY = os.path.join(SCRIPT_DIR, "config", "compare_prompt_template.txt")
 
 
 def _load_compare_prompt_from_file():
-    """从本地读取上次保存的比较提示词，失败返回 None。"""
-    for path in (COMPARE_PROMPT_FILE, _COMPARE_PROMPT_FILE_LEGACY):
+    """读取比较提示词：用户 md → 旧 txt → 样例 example.md → None"""
+    for path in (
+        COMPARE_PROMPT_FILE,
+        _COMPARE_PROMPT_FILE_LEGACY,
+        COMPARE_PROMPT_EXAMPLE_FILE,
+    ):
         if not os.path.exists(path):
             continue
         try:
@@ -559,8 +567,9 @@ def main():
             "提示词模板",
             height=200,
             key="compare_prompt_textarea",
-            help="必须包含 {reference} 和 {candidate} 变量。系统会自动追加JSON格式要求，"
-            "编辑内容会自动保存到 config/compare_prompt_template.md。",
+            help="必须包含 {reference} 和 {candidate} 变量。系统会自动追加JSON格式要求。"
+            "编辑内容保存到 config/compare_prompt_template.md；"
+            "未改过前可从 config/compare_prompt_template.example.md 参考样例。",
         )
         _save_compare_prompt_to_file(prompt_template)
         
